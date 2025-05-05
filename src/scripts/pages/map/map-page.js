@@ -1,6 +1,6 @@
 import { getStories } from "../../data/api";
 import { getToken } from "../../utils/auth";
-import { showFormattedDate } from "../../utils";
+import { showFormattedDate, animateElement } from "../../utils";
 
 export default class MapPage {
   async render() {
@@ -24,7 +24,7 @@ export default class MapPage {
     if (!token) {
       mapContent.innerHTML = `
         <div class="alert alert-error">
-          <p>You need to login to view the story map. <a href="#/login">Login here</a> or <a href="#/register">Register</a></p>
+          <p><i class="fas fa-exclamation-circle"></i> You need to login to view the story map. <a href="#/login">Login here</a> or <a href="#/register">Register</a></p>
         </div>
       `;
       return;
@@ -43,7 +43,7 @@ export default class MapPage {
       if (!stories || stories.length === 0) {
         mapContent.innerHTML = `
           <div class="alert">
-            <p>No stories with location data found. <a href="#/add">Create a story with location!</a></p>
+            <p><i class="fas fa-info-circle"></i> No stories with location data found. <a href="#/add">Create a story with location!</a></p>
           </div>
         `;
         return;
@@ -57,7 +57,7 @@ export default class MapPage {
       if (storiesWithLocation.length === 0) {
         mapContent.innerHTML = `
           <div class="alert">
-            <p>No stories with location data found. <a href="#/add">Create a story with location!</a></p>
+            <p><i class="fas fa-info-circle"></i> No stories with location data found. <a href="#/add">Create a story with location!</a></p>
           </div>
         `;
         return;
@@ -69,7 +69,8 @@ export default class MapPage {
         </div>
         
         <div class="story-list-summary">
-          <h3>Stories with Location (${storiesWithLocation.length})</h3>
+          <h3><i class="fas fa-map-marker-alt"></i> Stories with Location (${storiesWithLocation.length})</h3>
+          <p>Explore stories from different places. You can switch between different map styles using the layer control in the top-right corner.</p>
         </div>
       `;
 
@@ -78,7 +79,7 @@ export default class MapPage {
       console.error("Error loading story map:", error);
       mapContent.innerHTML = `
         <div class="alert alert-error">
-          <p>Failed to load story map. Please try again later.</p>
+          <p><i class="fas fa-exclamation-triangle"></i> Failed to load story map. Please try again later.</p>
         </div>
       `;
     }
@@ -102,16 +103,67 @@ export default class MapPage {
       // Create map instance
       const map = L.map("map").setView([centerLat, centerLon], 5);
 
-      // Add tile layer
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution:
-          '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      }).addTo(map);
+      // Define multiple tile layers (map styles)
+      const mapLayers = {
+        OpenStreetMap: L.tileLayer(
+          "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+          {
+            maxZoom: 19,
+            attribution:
+              '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          }
+        ),
 
-      // Add markers for all stories
+        "Stamen Watercolor": L.tileLayer(
+          "https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg",
+          {
+            attribution:
+              'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://creativecommons.org/licenses/by-sa/3.0">CC BY SA</a>. Tiles hosted by <a href="https://stadiamaps.com/">Stadia Maps</a>',
+            maxZoom: 16,
+          }
+        ),
+
+        "Stamen Terrain": L.tileLayer(
+          "https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png",
+          {
+            attribution:
+              'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://www.openstreetmap.org/copyright">ODbL</a>. Tiles hosted by <a href="https://stadiamaps.com/">Stadia Maps</a>',
+            maxZoom: 18,
+            subdomains: "abcd",
+          }
+        ),
+
+        "ESRI World Imagery": L.tileLayer(
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          {
+            attribution:
+              "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+            maxZoom: 18,
+          }
+        ),
+      };
+
+      // Add the default layer to the map
+      mapLayers["OpenStreetMap"].addTo(map);
+
+      // Create layer groups for organization
+      const storyMarkers = L.layerGroup();
+
+      // Create custom markers for stories
       stories.forEach((story) => {
-        const marker = L.marker([story.lat, story.lon]).addTo(map);
+        // Create custom icon for better visual appearance
+        const customIcon = L.divIcon({
+          className: "custom-map-marker",
+          html: `<div class="marker-pin" style="background-color: var(--primary-color); position: relative; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0,0,0,0.3);"><i class="fas fa-camera" style="color: white;"></i></div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 30],
+          popupAnchor: [0, -30],
+        });
+
+        const marker = L.marker([story.lat, story.lon], {
+          icon: customIcon,
+        }).addTo(map);
+        storyMarkers.addLayer(marker);
 
         // Create popup with story information
         const popupContent = `
@@ -121,7 +173,9 @@ export default class MapPage {
             <img src="${story.photoUrl}" alt="Story by ${
           story.name
         }" style="width: 100%; max-height: 100px; object-fit: cover;">
-            <p>${showFormattedDate(story.createdAt)}</p>
+            <p><i class="far fa-calendar-alt"></i> ${showFormattedDate(
+              story.createdAt
+            )}</p>
             <a href="#/detail/${
               story.id
             }" class="btn btn-outline">View Details</a>
@@ -131,9 +185,30 @@ export default class MapPage {
         marker.bindPopup(popupContent);
       });
 
+      storyMarkers.addTo(map);
+
+      // Set up layer controls
+      const overlays = {
+        "Story Locations": storyMarkers,
+      };
+
+      L.control
+        .layers(mapLayers, overlays, {
+          collapsed: false, // Expanded by default on desktop
+          position: "topright",
+        })
+        .addTo(map);
+
+      // Add a scale control
+      L.control.scale().addTo(map);
+
       // Force map to update its size
       setTimeout(() => {
         map.invalidateSize();
+
+        // Animate the map appearance
+        const mapElement = document.querySelector(".map-container");
+        animateElement(mapElement, "animate-fade-in", 800);
       }, 100);
     };
   }

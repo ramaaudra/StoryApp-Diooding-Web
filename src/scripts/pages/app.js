@@ -1,12 +1,14 @@
 import routes from "../routes/routes";
 import { getActiveRoute, parseActivePathname } from "../routes/url-parser";
 import { getAuth, isAuthenticated } from "../utils/auth";
+import { applyPageTransition } from "../utils/index";
 
 class App {
   #content = null;
   #drawerButton = null;
   #navigationDrawer = null;
   #authButton = null;
+  #currentPage = null;
 
   constructor({ navigationDrawer, drawerButton, content }) {
     this.#content = content;
@@ -66,6 +68,42 @@ class App {
     window.location.hash = "#/";
   };
 
+  // Determine which animation to use based on page navigation
+  #getAnimationType(newUrl) {
+    if (!this.#currentPage) return "fade"; // Default for first page load
+
+    // Determine page categories for better transition effects
+    const pageCategories = {
+      home: ["/"],
+      auth: ["/login", "/register"],
+      content: ["/detail", "/add"],
+      info: ["/about", "/map"],
+    };
+
+    const getCurrentCategory = (url) => {
+      for (const [category, urls] of Object.entries(pageCategories)) {
+        if (urls.some((path) => url.startsWith(path))) {
+          return category;
+        }
+      }
+      return "other";
+    };
+
+    const currentCategory = getCurrentCategory(this.#currentPage);
+    const newCategory = getCurrentCategory(newUrl);
+
+    // Choose animation type based on navigation pattern
+    if (currentCategory === newCategory) {
+      return "fade"; // Same category: subtle fade
+    } else if (currentCategory === "auth" && newCategory === "home") {
+      return "zoom"; // Login/register to home: zoom effect
+    } else if (newCategory === "content") {
+      return "slide"; // Content pages: slide animation
+    } else {
+      return "fade"; // Default animation
+    }
+  }
+
   async renderPage() {
     const url = getActiveRoute();
     const page = routes[url];
@@ -77,16 +115,16 @@ class App {
     }
 
     try {
-      // Use View Transition API if available
-      if (document.startViewTransition) {
-        await document.startViewTransition(async () => {
-          this.#content.innerHTML = await page.render(urlParams);
-          await page.afterRender(urlParams);
-        }).ready;
-      } else {
+      const animationType = this.#getAnimationType(url);
+
+      // Update the rendering with our animation system
+      await applyPageTransition(async () => {
         this.#content.innerHTML = await page.render(urlParams);
         await page.afterRender(urlParams);
-      }
+      }, animationType);
+
+      // Store the current URL for next transition
+      this.#currentPage = url;
     } catch (error) {
       console.error("Error rendering page:", error);
       this.#content.innerHTML = `

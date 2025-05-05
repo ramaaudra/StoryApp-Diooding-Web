@@ -6,6 +6,7 @@ export default class AddStoryPage {
   #marker = null;
   #selectedLocation = null;
   #mediaStream = null;
+  #locationWatchId = null;
 
   async render() {
     return `
@@ -61,11 +62,17 @@ export default class AddStoryPage {
             
             <!-- Location Section -->
             <div class="form-group">
-              <label for="location">Select Location on Map</label>
+              <label for="location">Location</label>
+              <div class="location-actions">
+                <button type="button" id="get-current-location" class="btn">
+                  <i class="fas fa-location-arrow"></i> Use My Current Location
+                </button>
+                <div id="location-status"></div>
+              </div>
               <div class="map-container" id="location-map-container">
                 <div id="map"></div>
               </div>
-              <p id="selected-location-text">No location selected. Click on the map to select a location.</p>
+              <p id="selected-location-text">No location selected. Click on the map to select a location or use your current location.</p>
             </div>
             
             <!-- Description -->
@@ -107,6 +114,7 @@ export default class AddStoryPage {
     this.initFileUpload();
     this.initTabSwitching();
     this.initMap();
+    this.initLocationFeatures();
     this.setupForm();
   }
 
@@ -330,28 +338,139 @@ export default class AddStoryPage {
       }).addTo(this.#map);
 
       this.#map.on("click", (e) => {
-        this.#selectedLocation = {
-          lat: e.latlng.lat,
-          lon: e.latlng.lng,
-        };
-
-        document.getElementById(
-          "selected-location-text"
-        ).textContent = `Selected location: ${e.latlng.lat.toFixed(
-          6
-        )}, ${e.latlng.lng.toFixed(6)}`;
-
-        if (this.#marker) {
-          this.#marker.setLatLng(e.latlng);
-        } else {
-          this.#marker = L.marker(e.latlng).addTo(this.#map);
-        }
+        this.updateSelectedLocation(e.latlng.lat, e.latlng.lng);
       });
 
       setTimeout(() => {
         this.#map.invalidateSize();
       }, 100);
     };
+  }
+
+  initLocationFeatures() {
+    const getCurrentLocationBtn = document.getElementById(
+      "get-current-location"
+    );
+    const locationStatus = document.getElementById("location-status");
+
+    getCurrentLocationBtn.addEventListener("click", () => {
+      if (!navigator.geolocation) {
+        locationStatus.innerHTML = `
+          <div class="alert alert-error">
+            <p><i class="fas fa-exclamation-triangle"></i> Geolocation is not supported by your browser</p>
+          </div>
+        `;
+        return;
+      }
+
+      locationStatus.innerHTML = `
+        <div class="location-loading">
+          <span class="loader-small"></span> Getting your location...
+        </div>
+      `;
+      getCurrentLocationBtn.disabled = true;
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+
+          // Update the selected location and map marker
+          this.updateSelectedLocation(latitude, longitude);
+
+          // Center and zoom the map to the user's location
+          this.#map.setView([latitude, longitude], 15);
+
+          locationStatus.innerHTML = `
+            <div class="alert alert-success">
+              <p><i class="fas fa-check-circle"></i> Location successfully obtained!</p>
+            </div>
+          `;
+          getCurrentLocationBtn.disabled = false;
+
+          // Clear the success message after a few seconds
+          setTimeout(() => {
+            locationStatus.innerHTML = "";
+          }, 3000);
+        },
+        (error) => {
+          let errorMessage;
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage =
+                "Location permission denied. Please allow access to your location.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = "Location information is unavailable.";
+              break;
+            case error.TIMEOUT:
+              errorMessage = "Request to get location timed out.";
+              break;
+            default:
+              errorMessage = "An unknown error occurred getting your location.";
+          }
+
+          locationStatus.innerHTML = `
+            <div class="alert alert-error">
+              <p><i class="fas fa-exclamation-triangle"></i> ${errorMessage}</p>
+            </div>
+          `;
+          getCurrentLocationBtn.disabled = false;
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
+    });
+  }
+
+  updateSelectedLocation(lat, lng) {
+    this.#selectedLocation = {
+      lat: lat,
+      lon: lng,
+    };
+
+    document.getElementById("selected-location-text").innerHTML = `
+      <span>Selected location: <strong>${lat.toFixed(6)}, ${lng.toFixed(
+      6
+    )}</strong></span>
+      <button type="button" id="clear-location" class="btn-small">
+        <i class="fas fa-times"></i> Clear
+      </button>
+    `;
+
+    // Add event listener to the clear button
+    document.getElementById("clear-location").addEventListener("click", (e) => {
+      e.preventDefault();
+      this.clearLocation();
+    });
+
+    if (this.#marker) {
+      this.#marker.setLatLng([lat, lng]);
+    } else {
+      // Create a custom marker with a bouncing animation
+      const customIcon = L.divIcon({
+        className: "custom-map-marker",
+        html: `<div class="marker-pin animate-bounce" style="background-color: var(--accent-color); position: relative; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0,0,0,0.3);"><i class="fas fa-map-marker-alt" style="color: white;"></i></div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+        popupAnchor: [0, -30],
+      });
+      this.#marker = L.marker([lat, lng], { icon: customIcon }).addTo(
+        this.#map
+      );
+    }
+  }
+
+  clearLocation() {
+    if (this.#marker) {
+      this.#map.removeLayer(this.#marker);
+      this.#marker = null;
+    }
+    this.#selectedLocation = null;
+    document.getElementById("selected-location-text").textContent =
+      "No location selected. Click on the map to select a location or use your current location.";
   }
 
   setupForm() {
@@ -452,5 +571,9 @@ export default class AddStoryPage {
 
   async destroy() {
     this.stopCameraStream();
+    // Clear any active location watching
+    if (this.#locationWatchId) {
+      navigator.geolocation.clearWatch(this.#locationWatchId);
+    }
   }
 }

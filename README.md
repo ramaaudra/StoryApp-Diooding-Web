@@ -33,12 +33,14 @@ Dicoding Story App is a modern web application that allows users to share their 
 ### Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/ramaaudra/dicoding-story-app.git
    cd dicoding-story-app
    ```
 
 2. Install dependencies:
+
    ```bash
    npm install
    # or
@@ -51,7 +53,6 @@ Dicoding Story App is a modern web application that allows users to share their 
    # or
    yarn dev
    ```
-
 
 ### Building for Production
 
