@@ -10,29 +10,45 @@ export default class AddStoryPage {
 
   async render() {
     return `
-      <section class="container">
+      <section class="container" aria-labelledby="add-story-heading">
         <div class="form-container">
-          <h2 class="form-title">Add New Story</h2>
+          <h2 class="form-title" id="add-story-heading">Add New Story</h2>
           
-          <div id="alert-container"></div>
+          <div id="alert-container" role="alert" aria-live="assertive"></div>
           
-          <form id="add-story-form">
+          <form id="add-story-form" aria-describedby="form-description">
+            <p id="form-description" class="sr-only">Fill in the form below to create a new story with a photo and optional location data.</p>
+            
             <!-- Photo Input Options -->
             <div class="photo-options">
-              <div class="option-tabs">
-                <button type="button" class="option-tab active" data-tab="camera">Camera</button>
-                <button type="button" class="option-tab" data-tab="gallery">Gallery</button>
+              <div class="option-tabs" role="tablist">
+                <button 
+                  type="button" 
+                  class="option-tab active" 
+                  data-tab="camera"
+                  id="camera-tab-btn" 
+                  role="tab"
+                  aria-selected="true" 
+                  aria-controls="camera-tab">Camera</button>
+                <button 
+                  type="button" 
+                  class="option-tab" 
+                  data-tab="gallery"
+                  id="gallery-tab-btn" 
+                  role="tab" 
+                  aria-selected="false" 
+                  aria-controls="gallery-tab">Gallery</button>
               </div>
               
               <!-- Camera Section -->
-              <div class="form-group tab-content" id="camera-tab">
-                <label for="photo">Take a Photo</label>
+              <div class="form-group tab-content" id="camera-tab" role="tabpanel" aria-labelledby="camera-tab-btn">
+                <label for="camera-stream">Take a Photo</label>
                 <div class="camera-container">
                   <div class="camera-preview-wrapper">
                     <div class="camera-preview" id="camera-preview">
-                      <video id="camera-stream" autoplay playsinline></video>
-                      <canvas id="camera-canvas" style="display: none;"></canvas>
-                      <img id="captured-image" class="captured-image" style="display: none;" alt="Captured photo">
+                      <video id="camera-stream" autoplay playsinline aria-label="Camera preview"></video>
+                      <canvas id="camera-canvas" style="display: none;" aria-hidden="true"></canvas>
+                      <img id="captured-image" class="captured-image" style="display: none;" alt="Your captured photo for the story" aria-live="polite">
                     </div>
                   </div>
                   <div class="camera-controls">
@@ -44,16 +60,17 @@ export default class AddStoryPage {
               </div>
               
               <!-- File Upload Section -->
-              <div class="form-group tab-content" id="gallery-tab" style="display: none;">
+              <div class="form-group tab-content" id="gallery-tab" style="display: none;" role="tabpanel" aria-labelledby="gallery-tab-btn">
                 <label for="file-upload">Upload Photo</label>
                 <div class="file-upload-container">
-                  <input type="file" id="file-upload" accept="image/*" class="file-input">
+                  <input type="file" id="file-upload" accept="image/*" class="file-input" aria-describedby="file-upload-help">
                   <label for="file-upload" class="file-upload-label">
-                    <span class="file-upload-icon">📁</span>
+                    <span class="file-upload-icon" aria-hidden="true">📁</span>
                     <span class="file-upload-text">Choose a file or drag it here</span>
                   </label>
+                  <p id="file-upload-help" class="sr-only">Accepted file types: JPG, PNG, GIF. Maximum file size: 5 MB.</p>
                   <div class="file-preview-container" style="display: none;">
-                    <img id="file-preview" class="file-preview-image" alt="Uploaded photo">
+                    <img id="file-preview" class="file-preview-image" alt="Your uploaded photo for the story">
                     <button type="button" id="btn-remove-file" class="camera-btn">Remove</button>
                   </div>
                 </div>
@@ -62,17 +79,18 @@ export default class AddStoryPage {
             
             <!-- Location Section -->
             <div class="form-group">
-              <label for="location">Location</label>
+              <label id="location-label">Location</label>
               <div class="location-actions">
-                <button type="button" id="get-current-location" class="btn">
-                  <i class="fas fa-location-arrow"></i> Use My Current Location
+                <button type="button" id="get-current-location" class="btn" aria-describedby="location-help">
+                  <i class="fas fa-location-arrow" aria-hidden="true"></i> Use My Current Location
                 </button>
-                <div id="location-status"></div>
+                <p id="location-help" class="sr-only">Adds your current geographic coordinates to the story</p>
+                <div id="location-status" role="status" aria-live="polite"></div>
               </div>
-              <div class="map-container" id="location-map-container">
+              <div class="map-container" id="location-map-container" aria-label="Interactive map to select location">
                 <div id="map"></div>
               </div>
-              <p id="selected-location-text">No location selected. Click on the map to select a location or use your current location.</p>
+              <p id="selected-location-text" aria-live="polite">No location selected. Click on the map to select a location or use your current location.</p>
             </div>
             
             <!-- Description -->
@@ -85,6 +103,7 @@ export default class AddStoryPage {
                 class="form-control"
                 required
                 placeholder="Write your story here..."
+                aria-required="true"
               ></textarea>
             </div>
             
@@ -110,12 +129,38 @@ export default class AddStoryPage {
       return;
     }
 
+    // Add styles for screen reader only text
+    this.addAccessibilityStyles();
+
     this.initCamera();
     this.initFileUpload();
     this.initTabSwitching();
     this.initMap();
     this.initLocationFeatures();
     this.setupForm();
+  }
+
+  // Add styles for screen reader only text
+  addAccessibilityStyles() {
+    // Add CSS for screen reader only elements if not already present
+    if (!document.getElementById("sr-only-styles")) {
+      const style = document.createElement("style");
+      style.id = "sr-only-styles";
+      style.innerHTML = `
+        .sr-only {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border-width: 0;
+        }
+      `;
+      document.head.appendChild(style);
+    }
   }
 
   initTabSwitching() {
@@ -125,17 +170,26 @@ export default class AddStoryPage {
     tabs.forEach((tab) => {
       tab.addEventListener("click", () => {
         // Remove active class from all tabs
-        tabs.forEach((t) => t.classList.remove("active"));
+        tabs.forEach((t) => {
+          t.classList.remove("active");
+          t.setAttribute("aria-selected", "false");
+        });
 
         // Add active class to clicked tab
         tab.classList.add("active");
+        tab.setAttribute("aria-selected", "true");
 
         // Hide all tab contents
-        tabContents.forEach((content) => (content.style.display = "none"));
+        tabContents.forEach((content) => {
+          content.style.display = "none";
+          content.setAttribute("aria-hidden", "true");
+        });
 
         // Show corresponding tab content
         const tabId = tab.getAttribute("data-tab");
-        document.getElementById(`${tabId}-tab`).style.display = "block";
+        const activeTabContent = document.getElementById(`${tabId}-tab`);
+        activeTabContent.style.display = "block";
+        activeTabContent.setAttribute("aria-hidden", "false");
 
         // If switching to camera tab, reset camera
         if (tabId === "camera") {

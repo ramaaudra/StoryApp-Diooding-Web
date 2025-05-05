@@ -6,10 +6,11 @@ import CONFIG from "../../config";
 export default class DetailPage {
   async render() {
     return `
-      <section class="container">
+      <section class="container" aria-labelledby="story-title">
         <div id="story-detail-container">
-          <div class="loader-container">
+          <div class="loader-container" role="status" aria-live="polite">
             <div class="loader"></div>
+            <span class="sr-only">Loading story details...</span>
           </div>
         </div>
       </section>
@@ -23,7 +24,7 @@ export default class DetailPage {
 
     if (!params || !params.id) {
       storyDetailContainer.innerHTML = `
-        <div class="alert alert-error">
+        <div class="alert alert-error" role="alert">
           <p>Story ID is missing. <a href="#/">Go back to home</a></p>
         </div>
       `;
@@ -34,7 +35,7 @@ export default class DetailPage {
 
     if (!token) {
       storyDetailContainer.innerHTML = `
-        <div class="alert alert-error">
+        <div class="alert alert-error" role="alert">
           <p>You need to login to view story details. <a href="#/login">Login here</a> or <a href="#/register">Register</a></p>
         </div>
       `;
@@ -58,7 +59,7 @@ export default class DetailPage {
     } catch (error) {
       console.error("Error fetching story detail:", error);
       storyDetailContainer.innerHTML = `
-        <div class="alert alert-error">
+        <div class="alert alert-error" role="alert">
           <p>Failed to load story details. Please try again later.</p>
         </div>
       `;
@@ -74,20 +75,29 @@ export default class DetailPage {
       <div class="detail-container" style="view-transition-name: story-${
         story.id
       }">
-        <a href="#/" class="btn btn-outline">← Back to Stories</a>
+        <a href="#/" class="btn btn-outline" aria-label="Back to story list">← Back to Stories</a>
         
-        <div class="detail-content">
-          <h1 class="detail-title">Story by ${story.name}</h1>
+        <article class="detail-content">
+          <h1 class="detail-title" id="story-title">Story by ${story.name}</h1>
           
           <div class="detail-meta">
-            <span>${showFormattedDate(story.createdAt)}</span>
+            <time datetime="${new Date(
+              story.createdAt
+            ).toISOString()}">${showFormattedDate(story.createdAt)}</time>
           </div>
           
-          <img 
-            src="${story.photoUrl}" 
-            alt="Story by ${story.name}" 
-            class="detail-image"
-          />
+          <figure>
+            <img 
+              src="${story.photoUrl}" 
+              alt="Photo shared by ${story.name} on ${showFormattedDate(
+      story.createdAt
+    )}" 
+              class="detail-image"
+            />
+            <figcaption class="sr-only">Story photo shared by ${
+              story.name
+            }</figcaption>
+          </figure>
           
           <div class="detail-description">
             <p>${story.description}</p>
@@ -97,15 +107,42 @@ export default class DetailPage {
             story.lat && story.lon
               ? `
             <div class="map-container" id="map-container">
-              <h3>Story Location</h3>
-              <div id="map"></div>
+              <h3 id="map-heading">Story Location</h3>
+              <div id="map" role="img" aria-labelledby="map-heading" aria-describedby="map-description"></div>
+              <p id="map-description" class="sr-only">Map showing the location where this story was created at coordinates ${story.lat}, ${story.lon}</p>
             </div>
           `
               : ""
           }
-        </div>
+        </article>
       </div>
     `;
+
+    // Add the sr-only class if it doesn't exist
+    this.addAccessibilityStyles();
+  }
+
+  // Add styles for screen reader only text
+  addAccessibilityStyles() {
+    // Add CSS for screen reader only elements if not already present
+    if (!document.getElementById("sr-only-styles")) {
+      const style = document.createElement("style");
+      style.id = "sr-only-styles";
+      style.innerHTML = `
+        .sr-only {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border-width: 0;
+        }
+      `;
+      document.head.appendChild(style);
+    }
   }
 
   async initMap(story) {
