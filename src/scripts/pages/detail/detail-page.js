@@ -1,9 +1,11 @@
-import { getStoryDetail } from "../../data/api";
 import { showFormattedDate } from "../../utils";
-import { getToken } from "../../utils/auth";
+import DetailPresenter from "./detail-presenter";
+import * as DicodingAPI from "../../data/api";
 import CONFIG from "../../config";
 
 export default class DetailPage {
+  #presenter = null;
+
   async render() {
     return `
       <section class="container" aria-labelledby="story-title">
@@ -18,55 +20,50 @@ export default class DetailPage {
   }
 
   async afterRender(params) {
+    this.#presenter = new DetailPresenter({
+      view: this,
+      model: DicodingAPI,
+    });
+
+    await this.#presenter.loadStoryDetail(params?.id);
+  }
+
+  showMissingIdError() {
     const storyDetailContainer = document.getElementById(
       "story-detail-container"
     );
-
-    if (!params || !params.id) {
-      storyDetailContainer.innerHTML = `
-        <div class="alert alert-error" role="alert">
-          <p>Story ID is missing. <a href="#/">Go back to home</a></p>
-        </div>
-      `;
-      return;
-    }
-
-    const token = getToken();
-
-    if (!token) {
-      storyDetailContainer.innerHTML = `
-        <div class="alert alert-error" role="alert">
-          <p>You need to login to view story details. <a href="#/login">Login here</a> or <a href="#/register">Register</a></p>
-        </div>
-      `;
-      return;
-    }
-
-    try {
-      const response = await getStoryDetail({ id: params.id, token });
-
-      if (response.error) {
-        throw new Error(response.message);
-      }
-
-      const story = response.story;
-      this.renderStoryDetail(story);
-
-      // Initialize map if coordinates are available
-      if (story.lat && story.lon) {
-        this.initMap(story);
-      }
-    } catch (error) {
-      console.error("Error fetching story detail:", error);
-      storyDetailContainer.innerHTML = `
-        <div class="alert alert-error" role="alert">
-          <p>Failed to load story details. Please try again later.</p>
-        </div>
-      `;
-    }
+    storyDetailContainer.innerHTML = `
+      <div class="alert alert-error" role="alert">
+        <p>Story ID is missing. <a href="#/">Go back to home</a></p>
+      </div>
+    `;
   }
 
-  renderStoryDetail(story) {
+  showLoginRequired() {
+    const storyDetailContainer = document.getElementById(
+      "story-detail-container"
+    );
+    storyDetailContainer.innerHTML = `
+      <div class="alert alert-error" role="alert">
+        <p>You need to login to view story details. <a href="#/login">Login here</a> or <a href="#/register">Register</a></p>
+      </div>
+    `;
+  }
+
+  showError(message) {
+    const storyDetailContainer = document.getElementById(
+      "story-detail-container"
+    );
+    storyDetailContainer.innerHTML = `
+      <div class="alert alert-error" role="alert">
+        <p>${
+          message || "Failed to load story details. Please try again later."
+        }</p>
+      </div>
+    `;
+  }
+
+  displayStoryDetail(story) {
     const storyDetailContainer = document.getElementById(
       "story-detail-container"
     );

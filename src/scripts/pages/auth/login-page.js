@@ -1,7 +1,9 @@
-import { loginUser } from "../../data/api";
-import { saveAuth } from "../../utils/auth";
+import LoginPresenter from "./login-presenter";
+import * as DicodingAPI from "../../data/api";
 
 export default class LoginPage {
+  #presenter = null;
+
   async render() {
     return `
       <section class="container">
@@ -52,9 +54,16 @@ export default class LoginPage {
   }
 
   async afterRender() {
+    this.#presenter = new LoginPresenter({
+      view: this,
+      model: DicodingAPI,
+    });
+
+    this.attachFormListener();
+  }
+
+  attachFormListener() {
     const loginForm = document.getElementById("login-form");
-    const loginButton = document.getElementById("login-button");
-    const alertContainer = document.getElementById("alert-container");
 
     loginForm.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -62,43 +71,37 @@ export default class LoginPage {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
 
-      try {
-        loginButton.disabled = true;
-        loginButton.textContent = "Logging in...";
-
-        const response = await loginUser({ email, password });
-
-        if (response.error) {
-          throw new Error(response.message);
-        }
-
-        // Save auth data to local storage
-        saveAuth(response);
-
-        // Dispatch auth changed event
-        window.dispatchEvent(new CustomEvent("auth-changed"));
-
-        // Show success message and redirect
-        alertContainer.innerHTML = `
-          <div class="alert alert-success">
-            <p>Login successful. Redirecting to homepage...</p>
-          </div>
-        `;
-
-        setTimeout(() => {
-          window.location.hash = "#/";
-        }, 1500);
-      } catch (error) {
-        console.error("Login error:", error);
-        alertContainer.innerHTML = `
-          <div class="alert alert-error">
-            <p>${error.message || "Failed to login. Please try again."}</p>
-          </div>
-        `;
-
-        loginButton.disabled = false;
-        loginButton.textContent = "Login";
-      }
+      await this.#presenter.login(email, password);
     });
+  }
+
+  setLoading(isLoading) {
+    const loginButton = document.getElementById("login-button");
+
+    if (isLoading) {
+      loginButton.disabled = true;
+      loginButton.textContent = "Logging in...";
+    } else {
+      loginButton.disabled = false;
+      loginButton.textContent = "Login";
+    }
+  }
+
+  showSuccess(message) {
+    const alertContainer = document.getElementById("alert-container");
+    alertContainer.innerHTML = `
+      <div class="alert alert-success">
+        <p>${message}</p>
+      </div>
+    `;
+  }
+
+  showError(message) {
+    const alertContainer = document.getElementById("alert-container");
+    alertContainer.innerHTML = `
+      <div class="alert alert-error">
+        <p>${message}</p>
+      </div>
+    `;
   }
 }

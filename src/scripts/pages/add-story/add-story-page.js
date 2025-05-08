@@ -1,7 +1,8 @@
-import { addStory } from "../../data/api";
-import { getToken } from "../../utils/auth";
+import AddStoryPresenter from "./add-story-presenter";
+import * as DicodingAPI from "../../data/api";
 
 export default class AddStoryPage {
+  #presenter = null;
   #map = null;
   #marker = null;
   #selectedLocation = null;
@@ -117,20 +118,19 @@ export default class AddStoryPage {
   }
 
   async afterRender() {
-    const token = getToken();
-    const alertContainer = document.getElementById("alert-container");
-
-    if (!token) {
-      alertContainer.innerHTML = `
-        <div class="alert alert-error">
-          <p>You need to login to add stories. <a href="#/login">Login here</a> or <a href="#/register">Register</a></p>
-        </div>
-      `;
-      return;
-    }
-
     // Add styles for screen reader only text
     this.addAccessibilityStyles();
+
+    // Initialize the presenter
+    this.#presenter = new AddStoryPresenter({
+      view: this,
+      model: DicodingAPI,
+    });
+
+    // Check if user is authenticated
+    if (!this.#presenter.checkAuth()) {
+      return;
+    }
 
     this.initCamera();
     this.initFileUpload();
@@ -138,6 +138,45 @@ export default class AddStoryPage {
     this.initMap();
     this.initLocationFeatures();
     this.setupForm();
+  }
+
+  showLoginRequired() {
+    const alertContainer = document.getElementById("alert-container");
+    alertContainer.innerHTML = `
+      <div class="alert alert-error">
+        <p>You need to login to add stories. <a href="#/login">Login here</a> or <a href="#/register">Register</a></p>
+      </div>
+    `;
+  }
+
+  showSuccess(message) {
+    const alertContainer = document.getElementById("alert-container");
+    alertContainer.innerHTML = `
+      <div class="alert alert-success">
+        <p>${message}</p>
+      </div>
+    `;
+  }
+
+  showError(message) {
+    const alertContainer = document.getElementById("alert-container");
+    alertContainer.innerHTML = `
+      <div class="alert alert-error">
+        <p>${message}</p>
+      </div>
+    `;
+  }
+
+  setLoading(isLoading) {
+    const submitButton = document.getElementById("submit-button");
+
+    if (isLoading) {
+      submitButton.disabled = true;
+      submitButton.textContent = "Submitting...";
+    } else {
+      submitButton.disabled = false;
+      submitButton.textContent = "Create Story";
+    }
   }
 
   // Add styles for screen reader only text
@@ -229,12 +268,9 @@ export default class AddStoryPage {
         retakeButton.style.display = "none";
       } catch (error) {
         console.error("Error accessing camera:", error);
-        const alertContainer = document.getElementById("alert-container");
-        alertContainer.innerHTML = `
-          <div class="alert alert-error">
-            <p>Failed to access camera. Please ensure you have granted camera permissions.</p>
-          </div>
-        `;
+        this.showError(
+          "Failed to access camera. Please ensure you have granted camera permissions."
+        );
       }
     });
 
@@ -529,8 +565,6 @@ export default class AddStoryPage {
 
   setupForm() {
     const form = document.getElementById("add-story-form");
-    const submitButton = document.getElementById("submit-button");
-    const alertContainer = document.getElementById("alert-container");
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -546,11 +580,7 @@ export default class AddStoryPage {
 
       if (activeTab === "camera") {
         if (!capturedImage.src || capturedImage.style.display === "none") {
-          alertContainer.innerHTML = `
-            <div class="alert alert-error">
-              <p>Please capture a photo using the camera.</p>
-            </div>
-          `;
+          this.showError("Please capture a photo using the camera.");
           return;
         }
 
@@ -560,65 +590,27 @@ export default class AddStoryPage {
         });
       } else {
         if (!fileInput.files || fileInput.files.length === 0) {
-          alertContainer.innerHTML = `
-            <div class="alert alert-error">
-              <p>Please select an image from your gallery.</p>
-            </div>
-          `;
+          this.showError("Please select an image from your gallery.");
           return;
         }
 
         imageFile = fileInput.files[0];
       }
 
-      if (!description.trim()) {
-        alertContainer.innerHTML = `
-          <div class="alert alert-error">
-            <p>Please enter a story description.</p>
-          </div>
-        `;
+      // Validate form data using presenter
+      if (!this.#presenter.validateFormData(description, imageFile)) {
         return;
       }
 
-      try {
-        submitButton.disabled = true;
-        submitButton.textContent = "Submitting...";
+      // Submit the story using presenter
+      const success = await this.#presenter.createStory(
+        description,
+        imageFile,
+        this.#selectedLocation
+      );
 
-        const token = getToken();
-        const response = await addStory({
-          description,
-          photo: imageFile,
-          lat: this.#selectedLocation?.lat,
-          lon: this.#selectedLocation?.lon,
-          token,
-        });
-
-        if (response.error) {
-          throw new Error(response.message);
-        }
-
-        alertContainer.innerHTML = `
-          <div class="alert alert-success">
-            <p>Story created successfully! Redirecting to home...</p>
-          </div>
-        `;
-
+      if (success) {
         this.stopCameraStream();
-
-        setTimeout(() => {
-          window.location.hash = "#/";
-        }, 2000);
-      } catch (error) {
-        console.error("Error creating story:", error);
-        alertContainer.innerHTML = `
-          <div class="alert alert-error">
-            <p>${
-              error.message || "Failed to create story. Please try again."
-            }</p>
-          </div>
-        `;
-        submitButton.disabled = false;
-        submitButton.textContent = "Create Story";
       }
     });
   }

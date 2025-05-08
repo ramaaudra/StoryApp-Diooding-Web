@@ -1,6 +1,9 @@
-import { registerUser } from "../../data/api";
+import RegisterPresenter from "./register-presenter";
+import * as DicodingAPI from "../../data/api";
 
 export default class RegisterPage {
+  #presenter = null;
+
   async render() {
     return `
       <section class="container">
@@ -64,9 +67,16 @@ export default class RegisterPage {
   }
 
   async afterRender() {
+    this.#presenter = new RegisterPresenter({
+      view: this,
+      model: DicodingAPI,
+    });
+
+    this.attachFormListener();
+  }
+
+  attachFormListener() {
     const registerForm = document.getElementById("register-form");
-    const registerButton = document.getElementById("register-button");
-    const alertContainer = document.getElementById("alert-container");
 
     registerForm.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -75,37 +85,37 @@ export default class RegisterPage {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
 
-      try {
-        registerButton.disabled = true;
-        registerButton.textContent = "Registering...";
-
-        const response = await registerUser({ name, email, password });
-
-        if (response.error) {
-          throw new Error(response.message);
-        }
-
-        // Show success message and redirect
-        alertContainer.innerHTML = `
-          <div class="alert alert-success">
-            <p>Registration successful. Please login with your new account.</p>
-          </div>
-        `;
-
-        setTimeout(() => {
-          window.location.hash = "#/login";
-        }, 2000);
-      } catch (error) {
-        console.error("Registration error:", error);
-        alertContainer.innerHTML = `
-          <div class="alert alert-error">
-            <p>${error.message || "Failed to register. Please try again."}</p>
-          </div>
-        `;
-
-        registerButton.disabled = false;
-        registerButton.textContent = "Register";
-      }
+      await this.#presenter.register(name, email, password);
     });
+  }
+
+  setLoading(isLoading) {
+    const registerButton = document.getElementById("register-button");
+
+    if (isLoading) {
+      registerButton.disabled = true;
+      registerButton.textContent = "Registering...";
+    } else {
+      registerButton.disabled = false;
+      registerButton.textContent = "Register";
+    }
+  }
+
+  showSuccess(message) {
+    const alertContainer = document.getElementById("alert-container");
+    alertContainer.innerHTML = `
+      <div class="alert alert-success">
+        <p>${message}</p>
+      </div>
+    `;
+  }
+
+  showError(message) {
+    const alertContainer = document.getElementById("alert-container");
+    alertContainer.innerHTML = `
+      <div class="alert alert-error">
+        <p>${message}</p>
+      </div>
+    `;
   }
 }

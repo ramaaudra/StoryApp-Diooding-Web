@@ -1,8 +1,10 @@
-import { getStories } from "../../data/api";
 import { showFormattedDate } from "../../utils";
-import { getToken, isAuthenticated } from "../../utils/auth";
+import HomePresenter from "./home-presenter";
+import * as DicodingAPI from "../../data/api";
 
 export default class HomePage {
+  #presenter = null;
+
   async render() {
     return `
       <div class="home-hero" role="banner">
@@ -36,44 +38,40 @@ export default class HomePage {
     // Add the sr-only class if it doesn't exist
     this.addAccessibilityStyles();
 
+    this.#presenter = new HomePresenter({
+      view: this,
+      model: DicodingAPI,
+    });
+
+    await this.#presenter.loadStories();
+  }
+
+  // View methods called by the presenter
+  showLoginRequired() {
     const storiesContainer = document.getElementById("stories-container");
+    storiesContainer.innerHTML = `
+      <div class="alert alert-error" role="alert">
+        <p>You need to login to view stories. <a href="#/login">Login here</a> or <a href="#/register">Register</a></p>
+      </div>
+    `;
+  }
 
-    try {
-      let token = getToken();
+  showEmptyStories() {
+    const storiesContainer = document.getElementById("stories-container");
+    storiesContainer.innerHTML = `
+      <div class="alert" role="alert">
+        <p>No stories found. Be the first to <a href="#/add">create a story!</a></p>
+      </div>
+    `;
+  }
 
-      if (!token) {
-        storiesContainer.innerHTML = `
-          <div class="alert alert-error" role="alert">
-            <p>You need to login to view stories. <a href="#/login">Login here</a> or <a href="#/register">Register</a></p>
-          </div>
-        `;
-        return;
-      }
-
-      const response = await getStories({ token });
-
-      if (response.error) {
-        throw new Error(response.message);
-      }
-
-      if (!response.listStory || response.listStory.length === 0) {
-        storiesContainer.innerHTML = `
-          <div class="alert" role="alert">
-            <p>No stories found. Be the first to <a href="#/add">create a story!</a></p>
-          </div>
-        `;
-        return;
-      }
-
-      this.renderStories(response.listStory);
-    } catch (error) {
-      console.error("Error fetching stories:", error);
-      storiesContainer.innerHTML = `
-        <div class="alert alert-error" role="alert">
-          <p>Failed to load stories. Please try again later.</p>
-        </div>
-      `;
-    }
+  showError(message) {
+    const storiesContainer = document.getElementById("stories-container");
+    storiesContainer.innerHTML = `
+      <div class="alert alert-error" role="alert">
+        <p>${message || "Failed to load stories. Please try again later."}</p>
+      </div>
+    `;
   }
 
   // Add styles for screen reader only text
@@ -99,7 +97,7 @@ export default class HomePage {
     }
   }
 
-  renderStories(stories) {
+  displayStories(stories) {
     const storiesContainer = document.getElementById("stories-container");
 
     const storiesHtml = stories

@@ -1,8 +1,10 @@
-import { getStories } from "../../data/api";
-import { getToken } from "../../utils/auth";
 import { showFormattedDate, animateElement } from "../../utils";
+import MapPresenter from "./map-presenter";
+import * as DicodingAPI from "../../data/api";
 
 export default class MapPage {
+  #presenter = null;
+
   async render() {
     return `
       <section class="container">
@@ -18,71 +20,66 @@ export default class MapPage {
   }
 
   async afterRender() {
+    this.#presenter = new MapPresenter({
+      view: this,
+      model: DicodingAPI,
+    });
+
+    await this.#presenter.loadStoriesWithLocation();
+  }
+
+  showLoginRequired() {
     const mapContent = document.getElementById("map-content");
-    const token = getToken();
+    mapContent.innerHTML = `
+      <div class="alert alert-error">
+        <p><i class="fas fa-exclamation-circle"></i> You need to login to view the story map. <a href="#/login">Login here</a> or <a href="#/register">Register</a></p>
+      </div>
+    `;
+  }
 
-    if (!token) {
-      mapContent.innerHTML = `
-        <div class="alert alert-error">
-          <p><i class="fas fa-exclamation-circle"></i> You need to login to view the story map. <a href="#/login">Login here</a> or <a href="#/register">Register</a></p>
-        </div>
-      `;
-      return;
-    }
+  showEmptyStories() {
+    const mapContent = document.getElementById("map-content");
+    mapContent.innerHTML = `
+      <div class="alert">
+        <p><i class="fas fa-info-circle"></i> No stories found. <a href="#/add">Create a story with location!</a></p>
+      </div>
+    `;
+  }
 
-    try {
-      // Request stories with location data
-      const response = await getStories({ token, location: 1 });
+  showEmptyStoriesWithLocation() {
+    const mapContent = document.getElementById("map-content");
+    mapContent.innerHTML = `
+      <div class="alert">
+        <p><i class="fas fa-info-circle"></i> No stories with location data found. <a href="#/add">Create a story with location!</a></p>
+      </div>
+    `;
+  }
 
-      if (response.error) {
-        throw new Error(response.message);
-      }
+  showError(message) {
+    const mapContent = document.getElementById("map-content");
+    mapContent.innerHTML = `
+      <div class="alert alert-error">
+        <p><i class="fas fa-exclamation-triangle"></i> ${
+          message || "Failed to load story map. Please try again later."
+        }</p>
+      </div>
+    `;
+  }
 
-      const stories = response.listStory;
+  displayMap(storiesWithLocation) {
+    const mapContent = document.getElementById("map-content");
+    mapContent.innerHTML = `
+      <div class="map-container large">
+        <div id="map"></div>
+      </div>
+      
+      <div class="story-list-summary">
+        <h3><i class="fas fa-map-marker-alt"></i> Stories with Location (${storiesWithLocation.length})</h3>
+        <p>Explore stories from different places. You can switch between different map styles using the layer control in the top-right corner.</p>
+      </div>
+    `;
 
-      if (!stories || stories.length === 0) {
-        mapContent.innerHTML = `
-          <div class="alert">
-            <p><i class="fas fa-info-circle"></i> No stories with location data found. <a href="#/add">Create a story with location!</a></p>
-          </div>
-        `;
-        return;
-      }
-
-      // Filter stories with location data
-      const storiesWithLocation = stories.filter(
-        (story) => story.lat && story.lon
-      );
-
-      if (storiesWithLocation.length === 0) {
-        mapContent.innerHTML = `
-          <div class="alert">
-            <p><i class="fas fa-info-circle"></i> No stories with location data found. <a href="#/add">Create a story with location!</a></p>
-          </div>
-        `;
-        return;
-      }
-
-      mapContent.innerHTML = `
-        <div class="map-container large">
-          <div id="map"></div>
-        </div>
-        
-        <div class="story-list-summary">
-          <h3><i class="fas fa-map-marker-alt"></i> Stories with Location (${storiesWithLocation.length})</h3>
-          <p>Explore stories from different places. You can switch between different map styles using the layer control in the top-right corner.</p>
-        </div>
-      `;
-
-      this.initMap(storiesWithLocation);
-    } catch (error) {
-      console.error("Error loading story map:", error);
-      mapContent.innerHTML = `
-        <div class="alert alert-error">
-          <p><i class="fas fa-exclamation-triangle"></i> Failed to load story map. Please try again later.</p>
-        </div>
-      `;
-    }
+    this.initMap(storiesWithLocation);
   }
 
   async initMap(stories) {
