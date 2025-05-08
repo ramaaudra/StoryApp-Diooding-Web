@@ -49,16 +49,21 @@ body {
 .skip-link {
   position: absolute;
   top: -50px;
-  left: 0;
+  left: 50%;
+  transform: translateX(-50%);
   background-color: var(--primary-color);
   color: white;
   padding: 8px 16px;
   z-index: 10000;
   transition: top 0.3s;
+  text-decoration: none;
+  font-weight: bold;
+  border-radius: 0 0 4px 4px;
+  box-shadow: var(--shadow-md);
 }
 
 .skip-link:focus {
-  top: 0;
+  top: 70px;
 }
 
 /* Enhanced header styling with gradient */
