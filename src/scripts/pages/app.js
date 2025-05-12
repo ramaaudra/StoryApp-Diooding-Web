@@ -9,6 +9,7 @@ class App {
   #navigationDrawer = null;
   #authButton = null;
   #currentPage = null;
+  #currentPageInstance = null;
 
   constructor({ navigationDrawer, drawerButton, content }) {
     this.#content = content;
@@ -115,6 +116,14 @@ class App {
     }
 
     try {
+      // Clean up the current page if it has a destroy method
+      if (
+        this.#currentPageInstance &&
+        typeof this.#currentPageInstance.destroy === "function"
+      ) {
+        await this.#currentPageInstance.destroy();
+      }
+
       const animationType = this.#getAnimationType(url);
 
       // Update the rendering with our animation system
@@ -123,8 +132,9 @@ class App {
         await page.afterRender(urlParams);
       }, animationType);
 
-      // Store the current URL for next transition
+      // Store the current URL and page instance for next transition
       this.#currentPage = url;
+      this.#currentPageInstance = page;
     } catch (error) {
       console.error("Error rendering page:", error);
       this.#content.innerHTML = `
